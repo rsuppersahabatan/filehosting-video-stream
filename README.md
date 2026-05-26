@@ -90,3 +90,16 @@ docker compose up -d --build
 docker compose exec app php artisan key:generate
 docker compose exec app php artisan migrate
 ```
+
+#### Pertama kali / setiap kali ubah asset
+> docker compose run --rm node npm install
+> docker compose run --rm node npm run dev
+
+#### Watch mode (rebuild saat file berubah)
+> docker compose run --rm node npm run watch
+
+#### Production build
+> docker compose run --rm node npm run prod
+
+#### Atau pakai service yang sudah didefinisikan (otomatis install + dev)
+> docker compose up node
