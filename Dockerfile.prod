@@ -1,0 +1,101 @@
+###############################################
+# Stage 1: build frontend assets with Node
+###############################################
+FROM node:14-alpine AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json* yarn.lock* webpack.mix.js tailwind.config.js ./
+RUN npm ci --no-audit --no-fund
+
+COPY resources ./resources
+COPY public ./public
+RUN npm run production
+
+
+###############################################
+# Stage 2: install PHP dependencies (prod only)
+###############################################
+FROM composer:2.2 AS vendor
+
+WORKDIR /app
+
+COPY composer.json composer.lock ./
+RUN composer install \
+        --no-dev \
+        --no-scripts \
+        --no-autoloader \
+        --prefer-dist \
+        --no-interaction \
+        --optimize-autoloader
+
+
+###############################################
+# Stage 3: final runtime image
+###############################################
+FROM php:7.4-fpm
+
+ARG user=laravel
+ARG uid=1000
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        curl \
+        gosu \
+        libpng-dev \
+        libonig-dev \
+        libxml2-dev \
+        libzip-dev \
+        libjpeg-dev \
+        libfreetype6-dev \
+        libwebp-dev \
+        zip \
+        unzip \
+        default-mysql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j$(nproc) \
+        pdo_mysql \
+        mbstring \
+        exif \
+        pcntl \
+        bcmath \
+        gd \
+        zip \
+        xml \
+        opcache \
+    && pecl install redis \
+    && docker-php-ext-enable redis
+
+# Production-tuned PHP / opcache settings
+COPY docker/php/local.ini      /usr/local/etc/php/conf.d/local.ini
+COPY docker/php/opcache.ini    /usr/local/etc/php/conf.d/opcache.ini
+COPY docker/php/www.conf       /usr/local/etc/php-fpm.d/www.conf
+
+COPY --from=composer:2.2 /usr/bin/composer /usr/bin/composer
+
+RUN useradd -G www-data,root -u ${uid} -d /home/${user} ${user} \
+    && mkdir -p /home/${user}/.composer \
+    && chown -R ${user}:${user} /home/${user}
+
+WORKDIR /var/www
+
+# Application source + prepared vendor / built assets
+COPY --chown=${user}:${user} . /var/www
+COPY --from=vendor --chown=${user}:${user} /app/vendor /var/www/vendor
+COPY --from=assets --chown=${user}:${user} /app/public /var/www/public
+
+RUN composer dump-autoload --classmap-authoritative --no-dev \
+    && mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache \
+    && chown -R ${user}:${user} storage bootstrap/cache \
+    && chmod -R 775 storage bootstrap/cache
+
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
+    && chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 9000
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["php-fpm"]
