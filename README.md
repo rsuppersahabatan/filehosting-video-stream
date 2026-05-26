@@ -76,3 +76,17 @@ FHV Stream have features:
 ```
 Comming soon (same with laravel instalation)
 ```
+
+### Install with Docker-Compose
+
+```
+$ cp .env.example .env
+
+# Sesuaikan .env:
+#   DB_HOST=mysql, DB_PORT=3306, DB_DATABASE=laravel, DB_USERNAME=laravel, DB_PASSWORD=secret
+#   REDIS_HOST=redis, REDIS_PORT=6379
+
+docker compose up -d --build
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate
+```
