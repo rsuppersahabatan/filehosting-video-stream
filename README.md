@@ -103,3 +103,52 @@ docker compose exec app php artisan migrate
 
 #### Atau pakai service yang sudah didefinisikan (otomatis install + dev)
 > docker compose up node
+
+#### Production 
+
+# 1. Siapkan .env (BUKAN .env.example) di server
+cat > .env <<'EOF'
+APP_NAME=Filevideo
+APP_ENV=production
+APP_KEY=                 # akan di-generate
+APP_DEBUG=false
+APP_URL=https://filevideo.example.com
+
+LOG_CHANNEL=stack
+
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=filevideo
+DB_USERNAME=filevideo
+DB_PASSWORD=GANTI_INI_PASSWORD_KUAT
+DB_ROOT_PASSWORD=GANTI_INI_ROOT_KUAT
+
+BROADCAST_DRIVER=log
+CACHE_DRIVER=redis
+QUEUE_CONNECTION=redis
+SESSION_DRIVER=redis
+SESSION_LIFETIME=120
+
+REDIS_HOST=redis
+REDIS_PASSWORD=GANTI_INI_REDIS_KUAT
+REDIS_PORT=6379
+
+APP_PORT=80
+EOF
+
+# 2. Build & start
+docker compose -f docker-compose.prod.yml up -d --build
+
+# 3. Setup awal
+docker compose -f docker-compose.prod.yml exec app php artisan key:generate --force
+docker compose -f docker-compose.prod.yml exec app php artisan migrate --force
+docker compose -f docker-compose.prod.yml exec app php artisan storage:link
+docker compose -f docker-compose.prod.yml exec app php artisan config:cache
+docker compose -f docker-compose.prod.yml exec app php artisan route:cache
+docker compose -f docker-compose.prod.yml exec app php artisan view:cache
+
+# 4. Cek
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f
+
