@@ -16,5 +16,11 @@ mkdir -p \
 chown -R laravel:laravel /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true
 chmod -R ug+rwX /var/www/storage /var/www/bootstrap/cache 2>/dev/null || true
 
-# Drop privileges and exec the main process as the laravel user
+# Run php-fpm as root so it can bind/open log streams; the pool config
+# spawns workers as the unprivileged "laravel" user. For other commands
+# (composer, artisan, etc.) drop to the laravel user via gosu.
+if [ "$1" = "php-fpm" ]; then
+  exec "$@"
+fi
+
 exec gosu laravel "$@"
