@@ -6,6 +6,7 @@ ARG uid=1000
 RUN apt-get update && apt-get install -y \
     git \
     curl \
+    gosu \
     libpng-dev \
     libonig-dev \
     libxml2-dev \
@@ -52,8 +53,11 @@ RUN composer dump-autoload --optimize \
   && chown -R ${user}:${user} storage bootstrap/cache \
   && chmod -R 775 storage bootstrap/cache
 
-USER ${user}
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
+  && chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 9000
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["php-fpm"]
